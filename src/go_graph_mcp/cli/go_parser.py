@@ -144,7 +144,7 @@ def _download_go_data(verbose=False):
     Returns:
         tuple: (file_path, temp_file_path) where temp_file_path needs cleanup
     """
-    go_url = "https://purl.obolibrary.org/obo/go/go-basic.json"
+    go_url = "https://purl.obolibrary.org/obo/go/extensions/go-plus.json"
     
     if verbose:
         click.echo(f"Downloading GO data from {go_url}")

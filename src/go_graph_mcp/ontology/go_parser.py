@@ -55,6 +55,18 @@ class GOParser:
             )
         """)
         
+        # Create schema for taxonomy constraints
+        self.conn.execute("""
+            CREATE NODE TABLE TaxonConstraint (
+                id STRING,
+                term_id STRING,
+                constraint_type STRING,
+                taxon_id INT64,
+                taxon_name STRING,
+                PRIMARY KEY (id)
+            )
+        """)
+        
         # Create schema for relationships between GO terms
         self.conn.execute("""
             CREATE REL TABLE IS_A (
@@ -161,6 +173,52 @@ class GOParser:
                     synonyms.append(val)
         
         return list(set(synonyms))  # Remove duplicates
+
+    def _extract_taxon_constraints(self, term_data: Dict) -> List[tuple]:
+        """Extract taxonomy constraints from a term's metadata.
+        
+        Args:
+            term_data: Term data dictionary
+            
+        Returns:
+            List of (constraint_type, taxon_id) tuples
+        """
+        constraints = []
+        meta = term_data.get('meta', {})
+        
+        # Look for property values containing taxon constraints
+        prop_values = meta.get('propertyValues', [])
+        for prop_val in prop_values:
+            pred = prop_val.get('pred', '')
+            val = prop_val.get('val', '')
+            
+            # Check for RO:0002161 (in_taxon) and RO:0002162 (never_in_taxon)
+            if pred == 'RO:0002161' or 'in_taxon' in pred:
+                # Extract NCBI taxon ID
+                taxon_match = re.search(r'NCBITaxon[_:](\d+)', val)
+                if taxon_match:
+                    constraints.append(('in_taxon', int(taxon_match.group(1))))
+            elif pred == 'RO:0002162' or 'never_in_taxon' in pred:
+                taxon_match = re.search(r'NCBITaxon[_:](\d+)', val)
+                if taxon_match:
+                    constraints.append(('never_in_taxon', int(taxon_match.group(1))))
+        
+        # Also check in basicPropertyValues for alternative formats
+        basic_props = meta.get('basicPropertyValues', [])
+        for prop in basic_props:
+            pred = prop.get('pred', '')
+            val = prop.get('val', '')
+            
+            if ('RO_0002161' in pred or 'in_taxon' in pred.lower()) and 'NCBITaxon' in val:
+                taxon_match = re.search(r'NCBITaxon[_:](\d+)', val)
+                if taxon_match:
+                    constraints.append(('in_taxon', int(taxon_match.group(1))))
+            elif ('RO_0002162' in pred or 'never_in_taxon' in pred.lower()) and 'NCBITaxon' in val:
+                taxon_match = re.search(r'NCBITaxon[_:](\d+)', val)
+                if taxon_match:
+                    constraints.append(('never_in_taxon', int(taxon_match.group(1))))
+        
+        return constraints
 
     def _find_relationships(self, term_data: Dict) -> List[tuple]:
         """Find relationships to other terms.
@@ -302,15 +360,17 @@ class GOParser:
             if meta.get('deprecated', False):
                 continue
                 
-            # Store term data including synonyms
+            # Store term data including synonyms and taxonomy constraints
             synonyms = self._extract_synonyms(term)
+            taxon_constraints = self._extract_taxon_constraints(term)
             namespace_terms[go_id] = {
                 'id': go_id,
                 'name': term.get('lbl', ''),
                 'namespace': term_namespace,
                 'definition': self._extract_definition(term),
                 'comment': self._extract_comment(term),
-                'synonyms': synonyms
+                'synonyms': synonyms,
+                'taxon_constraints': taxon_constraints
             }
             
             # Find relationships
@@ -382,6 +442,35 @@ class GOParser:
                     synonym_count += 1
         
         print(f"Inserted {synonym_count} synonyms")
+        
+        # Insert taxonomy constraints
+        print(f"Inserting taxonomy constraints...")
+        constraint_count = 0
+        for term_id, term_data in namespace_terms.items():
+            constraints = term_data.get('taxon_constraints', [])
+            for idx, (constraint_type, taxon_id) in enumerate(constraints):
+                constraint_id = f"{term_id}_taxon_{idx}"
+                # Get taxon name if possible (we'll add this later with ETE3)
+                taxon_name = f"NCBITaxon:{taxon_id}"  # Placeholder for now
+                
+                self.conn.execute("""
+                    CREATE (tc:TaxonConstraint {
+                        id: $id, 
+                        term_id: $term_id, 
+                        constraint_type: $constraint_type,
+                        taxon_id: $taxon_id,
+                        taxon_name: $taxon_name
+                    })
+                """, {
+                    'id': constraint_id, 
+                    'term_id': term_id, 
+                    'constraint_type': constraint_type,
+                    'taxon_id': taxon_id,
+                    'taxon_name': taxon_name
+                })
+                constraint_count += 1
+        
+        print(f"Inserted {constraint_count} taxonomy constraints")
         
         # Insert relationships
         print(f"Collecting relationships...")

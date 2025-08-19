@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from go_graph_mcp.client import GOClient, GOTextAugmentor, AugmentationOptions
+from go_graph_mcp.client import GOClient, GOTextAugmentor, AugmentationOptions, TaxonomyFilterOptions
 
 
 @click.group()
@@ -67,12 +67,31 @@ def get_term(database, go_id):
     type=float,
     help="Minimum relevance score 0-100 (default: 30.0)",
 )
+@click.option(
+    "--include-taxa",
+    multiple=True,
+    help="Include only terms for these taxa (e.g., 'plants', 'mammals'). Can be used multiple times.",
+)
+@click.option(
+    "--exclude-taxa", 
+    multiple=True,
+    help="Exclude terms for these taxa (e.g., 'plants', 'bacteria'). Can be used multiple times.",
+)
 @click.argument("query")
-def search(database, limit, min_score, query):
+def search(database, limit, min_score, include_taxa, exclude_taxa, query):
     """Search for GO terms using fuzzy matching."""
     try:
+        # Create taxonomy filter if needed
+        taxonomy_filter = None
+        if include_taxa or exclude_taxa:
+            taxonomy_filter = TaxonomyFilterOptions(
+                include_taxa=list(include_taxa),
+                exclude_taxa=list(exclude_taxa)
+            )
+        
         with GOClient(database) as client:
-            results = client.search_terms(query, limit=limit, min_score=min_score)
+            results = client.search_terms(query, limit=limit, min_score=min_score, 
+                                        taxonomy_filter=taxonomy_filter)
             
             if not results:
                 click.echo(f"No terms found matching '{query}'")
