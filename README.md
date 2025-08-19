@@ -1,4 +1,4 @@
-# GO Graph MCP
+# GO Graph
 
 A Python package for parsing Gene Ontology (GO) data into KuzuDB graph database and providing fuzzy search capabilities with text augmentation.
 
