@@ -15,7 +15,7 @@ from go_graph_mcp.ontology.go_parser import GOParser
 
 @click.group()
 def cli():
-    """skuzu - Tools for bioinformatics with KuzuDB."""
+    "go graph CLI for parsing Gene Ontology data into a KuzuDB graph database."
     pass
 
 

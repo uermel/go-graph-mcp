@@ -26,11 +26,13 @@ dependencies = [
     "ete3",
     "six",
     "numpy",
+    "fastmcp",
 ]
 
 [project.scripts]
 parse_go = "go_graph_mcp.cli.go_parser:cli"
 query_go = "go_graph_mcp.cli.query_cli:cli"
+go_graph_setup = "go_graph_mcp.cli.mcp_setup:cli"
 
 [project.optional-dependencies]
 dev = [
