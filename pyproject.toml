@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skuzu"
+dynamic = ["version"]
+description = "skuzu package"
+readme = "README.md"
+requires-python = ">3.10"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Author"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "kuzu",
+    "click",
+]
+
+[project.scripts]
+skuzu = "skuzu.cli.go_parser:cli"
+skuzu-hierarchy = "skuzu.cli.hierarchy_parser:cli"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pre-commit",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/username/skuzu"
+
+[tool.hatch.version]
+path = "src/skuzu/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skuzu"]
+
+[tool.hatch.build]
+only-packages = true
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+select = ["E", "F", "I", "B", "W"]
+ignore = []
+
+[tool.ruff.isort]
+known-first-party = ["skuzu"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py" 
