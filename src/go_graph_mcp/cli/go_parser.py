@@ -19,7 +19,7 @@ def cli():
     pass
 
 
-@cli.command(name="parse-go")
+@cli.command(name="parse")
 @click.option(
     "--input",
     "-i",
