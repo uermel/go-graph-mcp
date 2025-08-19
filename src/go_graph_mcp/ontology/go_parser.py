@@ -28,11 +28,8 @@ class GOParser:
         # Remove existing database directory if it exists
         if os.path.exists(self.db_path):
             shutil.rmtree(self.db_path)
-            
-        # Create the database directory
-        os.makedirs(self.db_path, exist_ok=True)
         
-        # Initialize the database
+        # Initialize the database (KuzuDB will create the directory)
         self.db = kuzu.Database(self.db_path)
         self.conn = kuzu.Connection(self.db)
         
@@ -44,6 +41,16 @@ class GOParser:
                 namespace STRING,
                 definition STRING,
                 comment STRING,
+                PRIMARY KEY (id)
+            )
+        """)
+        
+        # Create schema for synonyms
+        self.conn.execute("""
+            CREATE NODE TABLE Synonym (
+                id STRING,
+                term_id STRING,
+                synonym STRING,
                 PRIMARY KEY (id)
             )
         """)
@@ -120,6 +127,40 @@ class GOParser:
         if comments:
             return comments[0]
         return ''
+
+    def _extract_synonyms(self, term_data: Dict) -> List[str]:
+        """Extract synonyms from a term's metadata.
+        
+        Args:
+            term_data: Term data dictionary
+            
+        Returns:
+            List of synonym strings
+        """
+        synonyms = []
+        meta = term_data.get('meta', {})
+        
+        # Extract from synonyms list
+        synonym_list = meta.get('synonyms', [])
+        for syn in synonym_list:
+            if isinstance(syn, dict):
+                val = syn.get('val', '')
+                if val:
+                    synonyms.append(val)
+            elif isinstance(syn, str):
+                synonyms.append(syn)
+        
+        # Extract from basicPropertyValues (alternate names)
+        basic_props = meta.get('basicPropertyValues', [])
+        for prop in basic_props:
+            pred = prop.get('pred', '')
+            val = prop.get('val', '')
+            # Look for synonym-related predicates
+            if 'synonym' in pred.lower() or 'altLabel' in pred:
+                if val:
+                    synonyms.append(val)
+        
+        return list(set(synonyms))  # Remove duplicates
 
     def _find_relationships(self, term_data: Dict) -> List[tuple]:
         """Find relationships to other terms.
@@ -261,13 +302,15 @@ class GOParser:
             if meta.get('deprecated', False):
                 continue
                 
-            # Store term data
+            # Store term data including synonyms
+            synonyms = self._extract_synonyms(term)
             namespace_terms[go_id] = {
                 'id': go_id,
                 'name': term.get('lbl', ''),
                 'namespace': term_namespace,
                 'definition': self._extract_definition(term),
-                'comment': self._extract_comment(term)
+                'comment': self._extract_comment(term),
+                'synonyms': synonyms
             }
             
             # Find relationships
@@ -324,6 +367,21 @@ class GOParser:
             """
             
             self.conn.execute(query, params)
+        
+        # Insert synonyms
+        print(f"Inserting synonyms...")
+        synonym_count = 0
+        for term_id, term_data in namespace_terms.items():
+            synonyms = term_data.get('synonyms', [])
+            for idx, synonym in enumerate(synonyms):
+                if synonym and synonym.strip():
+                    synonym_id = f"{term_id}_{idx}"
+                    self.conn.execute("""
+                        CREATE (s:Synonym {id: $id, term_id: $term_id, synonym: $synonym})
+                    """, {'id': synonym_id, 'term_id': term_id, 'synonym': synonym.strip()})
+                    synonym_count += 1
+        
+        print(f"Inserted {synonym_count} synonyms")
         
         # Insert relationships
         print(f"Collecting relationships...")

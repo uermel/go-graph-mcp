@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "skuzu"
+name = "go_graph_mcp"
 dynamic = ["version"]
-description = "skuzu package"
+description = "go_graph_mcp package"
 readme = "README.md"
 requires-python = ">3.10"
 license = {file = "LICENSE"}
@@ -20,11 +20,14 @@ classifiers = [
 dependencies = [
     "kuzu",
     "click",
+    "requests",
+    "pydantic>=2.0",
+    "rapidfuzz",
 ]
 
 [project.scripts]
-skuzu = "skuzu.cli.go_parser:cli"
-skuzu-hierarchy = "skuzu.cli.hierarchy_parser:cli"
+parse_go = "go_graph_mcp.cli.go_parser:cli"
+query_go = "go_graph_mcp.cli.query_cli:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -35,13 +38,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/username/skuzu"
+Homepage = "https://github.com/username/go_graph_mcp"
 
 [tool.hatch.version]
-path = "src/skuzu/__init__.py"
+path = "src/go_graph_mcp/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/skuzu"]
+packages = ["src/go_graph_mcp"]
 
 [tool.hatch.build]
 only-packages = true
@@ -58,7 +61,7 @@ select = ["E", "F", "I", "B", "W"]
 ignore = []
 
 [tool.ruff.isort]
-known-first-party = ["skuzu"]
+known-first-party = ["go_graph_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

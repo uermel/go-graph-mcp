@@ -2,12 +2,15 @@
 
 import os
 import sys
+import tempfile
 import traceback
 from pathlib import Path
+from urllib.parse import urlparse
 
 import click
+import requests
 
-from skuzu.ontology.go_parser import GOParser
+from go_graph_mcp.ontology.go_parser import GOParser
 
 
 @click.group()
@@ -20,9 +23,9 @@ def cli():
 @click.option(
     "--input",
     "-i",
-    required=True,
+    required=False,
     type=click.Path(exists=True, file_okay=True, readable=True),
-    help="Path to the GO JSON file",
+    help="Path to the GO JSON file (optional - will download from OBO if not provided)",
 )
 @click.option(
     "--output",
@@ -61,9 +64,16 @@ def parse_go(input, output, namespace, verbose, force, debug):
     
     This command parses GO data from a JSON file and loads it into a KuzuDB graph database.
     By default, it only processes terms in the cellular_component namespace.
+    If no input file is provided, it will automatically download the latest GO data.
     """
-    # Get absolute paths
-    input_path = os.path.abspath(input)
+    # Handle input - either provided file or download
+    if input:
+        input_path = os.path.abspath(input)
+        temp_file = None
+    else:
+        # Download GO data from OBO library
+        input_path, temp_file = _download_go_data(verbose)
+    
     output_path = os.path.abspath(output)
     
     click.echo(f"Processing GO data from {input_path}")
@@ -115,6 +125,55 @@ def parse_go(input, output, namespace, verbose, force, debug):
     finally:
         if parser.conn:
             parser.close()
+        # Clean up temporary file if we downloaded it
+        if temp_file:
+            try:
+                os.unlink(temp_file)
+                if verbose:
+                    click.echo(f"Cleaned up temporary file: {temp_file}")
+            except OSError:
+                pass
+
+
+def _download_go_data(verbose=False):
+    """Download GO data from the OBO library.
+    
+    Args:
+        verbose: Whether to show verbose output
+        
+    Returns:
+        tuple: (file_path, temp_file_path) where temp_file_path needs cleanup
+    """
+    go_url = "https://purl.obolibrary.org/obo/go/go-basic.json"
+    
+    if verbose:
+        click.echo(f"Downloading GO data from {go_url}")
+    
+    try:
+        # Create a temporary file
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.json', prefix='go-basic-')
+        
+        # Download the data
+        response = requests.get(go_url, stream=True)
+        response.raise_for_status()
+        
+        # Write to temporary file
+        with os.fdopen(temp_fd, 'wb') as temp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                temp_file.write(chunk)
+        
+        if verbose:
+            file_size = os.path.getsize(temp_path)
+            click.echo(f"Downloaded GO data ({file_size:,} bytes) to temporary file")
+        
+        return temp_path, temp_path
+        
+    except requests.exceptions.RequestException as e:
+        click.echo(f"Error downloading GO data: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error creating temporary file: {e}", err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

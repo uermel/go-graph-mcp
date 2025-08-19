@@ -1,4 +1,4 @@
-# skuzu
+# go-graph-mcp
 
 A Python package with src/skuzu organization.
 
@@ -22,8 +22,9 @@ hatch build
 ## Usage
 
 ```python
-import skuzu
-print(skuzu.__version__)
+import go_graph_mcp
+
+print(go_graph_mcp.__version__)
 ```
 
 ### Gene Ontology Parser
@@ -43,7 +44,7 @@ skuzu parse-go --input data/go-basic.json --output ./go_db --namespace biologica
 #### Python API Usage
 
 ```python
-from skuzu.go_parser import GOParser
+from go_graph_mcp.go_parser import GOParser
 
 # Initialize the parser with the output database path
 parser = GOParser("./go_db")
